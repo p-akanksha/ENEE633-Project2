@@ -104,11 +104,19 @@ def load_data():
 
 def train(epoch, device):
   network.train()
+
   for batch_idx, (data, target) in enumerate(train_loader):
+    # set the gradients to zero
     optimizer.zero_grad()
+
+    # load data to gpu
     data = data.to(device)
     target = target.to(device)
+
+    # forward pass
     output = network(data)
+
+    # calculate loss
     loss = F.nll_loss(F.log_softmax(output), target)
     loss.backward()
     optimizer.step()
@@ -116,11 +124,13 @@ def train(epoch, device):
       print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
         epoch, batch_idx * len(data), len(train_loader.dataset),
         100. * batch_idx / len(train_loader), loss.item()))
-      train_losses.append(loss.item())
-      train_counter.append(
-        (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
+      # train_losses.append(loss.item())
+      # train_counter.append(
+      #   (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
       torch.save(network.state_dict(), './results/model.pth')
       torch.save(optimizer.state_dict(), './results/optimizer.pth')
+
+  return loss.item()
 
 def test(device):
   network.eval()
@@ -135,17 +145,18 @@ def test(device):
       pred = output.data.max(1, keepdim=True)[1]
       correct += pred.eq(target.data.view_as(pred)).sum()
   test_loss /= len(test_loader.dataset)
-  test_losses.append(test_loss)
+  # test_losses.append(test_loss)
   print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
     test_loss, correct, len(test_loader.dataset),
     100. * correct / len(test_loader.dataset)))
+  return test_loss
 
 if __name__ == '__main__':
 
     ## Hyperparameters
-    n_epochs = 10
-    batch_size_train = 256
-    batch_size_test = 1000
+    n_epochs = 5
+    # batch_size_train = 256
+    # batch_size_test = 1000
     learning_rate = 0.01
     momentum = 0.5
     log_interval = 10
@@ -167,18 +178,27 @@ if __name__ == '__main__':
     train_losses = []
     train_counter = []
     test_losses = []
-    test_counter = [i*len(train_loader.dataset) for i in range(n_epochs + 1)]
+    test_counter = []
 
     test(device)
     for epoch in range(1, n_epochs + 1):
-      train(epoch, device)
-      test(device)
+      train_loss = train(epoch, device)
+      test_loss = test(device)
 
+      train_losses.append(train_loss)
+      train_counter.append(epoch)
+      test_losses.append(test_loss)
+      test_counter.append(epoch)
+
+    print(train_losses)
+    print(train_counter)
+    print(test_losses)
+    print(test_counter)
     fig = plt.figure()
     plt.plot(train_counter, train_losses, color='blue')
     plt.scatter(test_counter, test_losses, color='red')
     plt.legend(['Train Loss', 'Test Loss'], loc='upper right')
-    plt.xlabel('number of training examples seen')
+    plt.xlabel('Epoch')
     plt.ylabel('negative log likelihood loss')
     fig
     plt.show()
